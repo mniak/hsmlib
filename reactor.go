@@ -1,45 +1,77 @@
-package main
+package hsmlib
 
 import (
 	"context"
 	"io"
 	"log"
+	"net"
 )
 
 type Reactor struct {
 	IDManager IDManager
-	Protocol  Protocol[PacketWithID]
-	RW        io.ReadWriter
+	Stream    io.ReadWriter
+	done      chan struct{}
+}
+
+func NewReactorFromReadWriter(rw io.ReadWriter) Reactor {
+	reactor := Reactor{
+		IDManager: &SequentialIDManager{},
+		Stream:    rw,
+	}
+	return reactor
+}
+
+func NewReactor(target string) (Reactor, error) {
+	conn, err := net.Dial("tcp", target)
+	if err != nil {
+		return Reactor{}, err
+	}
+	return NewReactorFromReadWriter(conn), nil
 }
 
 func (m *Reactor) Start() {
+	m.done = make(chan struct{})
 	go func() {
 		for {
-			packet, err := m.Protocol.Receive(m.RW)
-			if err != nil {
-				log.Println("error handling packet", err)
-				continue
+			select {
+			case <-m.done:
+				return
+			default:
+				m.receiveOnePacket()
 			}
-
-			channel, found := m.IDManager.FindChannel(packet.ID)
-			if !found {
-				log.Printf("callback channel not found for id %02X\n", packet.ID)
-				continue
-			}
-
-			go func() {
-				channel <- packet.Data
-			}()
 		}
 	}()
 }
 
+func (m *Reactor) receiveOnePacket() {
+	packet, err := ReceivePacket(m.Stream)
+	if err != nil {
+		log.Println("error receiving frame", err)
+		return
+	}
+	channel, found := m.IDManager.FindChannel(packet.Header)
+	if !found {
+		log.Printf("callback channel not found for id %02X\n", packet.Header)
+		return
+	}
+
+	go func() {
+		channel <- packet.Payload
+		close(channel)
+	}()
+}
+
+func (m *Reactor) Stop() {
+	close(m.done)
+}
+
 func (m *Reactor) Post(ctx context.Context, data []byte) ([]byte, error) {
 	id, ch := m.IDManager.NewID()
-	err := m.Protocol.Send(m.RW, PacketWithID{
-		ID:   id,
-		Data: data,
-	})
+	packet := Packet{
+		Header:  id,
+		Payload: data,
+	}
+	err := SendPacket(m.Stream, packet)
 	if err != nil {
 		return nil, err
 	}
@@ -50,14 +82,4 @@ func (m *Reactor) Post(ctx context.Context, data []byte) ([]byte, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-}
-
-func NewReactor(rw io.ReadWriter) Reactor {
-	idWrap := NewHSMProtocol()
-	reactor := Reactor{
-		IDManager: &SequentialUint32IDManager{},
-		Protocol:  idWrap,
-		RW:        rw,
-	}
-	return reactor
 }

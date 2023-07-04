@@ -1,4 +1,4 @@
-package main
+package hsmlib
 
 import (
 	"encoding/binary"
@@ -12,16 +12,16 @@ type IDManager interface {
 	FindChannel(id []byte) (chan<- []byte, bool)
 }
 
-type SequentialUint32IDManager struct {
+type SequentialIDManager struct {
 	ids     sync.Map
 	counter atomic.Uint32
 }
 
-func (m *SequentialUint32IDManager) IDLength() int {
-	return 4
+func (m *SequentialIDManager) IDLength() int {
+	return HeaderLength
 }
 
-func (m *SequentialUint32IDManager) NewID() ([]byte, <-chan []byte) {
+func (m *SequentialIDManager) NewID() ([]byte, <-chan []byte) {
 	newID := m.counter.Add(1)
 	callbackChanI, _ := m.ids.LoadOrStore(newID, make(chan []byte))
 	callbackChan := callbackChanI.(chan []byte)
@@ -29,7 +29,7 @@ func (m *SequentialUint32IDManager) NewID() ([]byte, <-chan []byte) {
 	return newIDBytes, callbackChan
 }
 
-func (m *SequentialUint32IDManager) FindChannel(id []byte) (chan<- []byte, bool) {
+func (m *SequentialIDManager) FindChannel(id []byte) (chan<- []byte, bool) {
 	callbackChanI, found := m.ids.Load(id)
 	if !found {
 		return nil, false

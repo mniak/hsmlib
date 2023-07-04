@@ -5,14 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Package",
+            "name": "Start Multiplexer",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}",
-            "env": {
-                "TARGET_ADDR": ":9999",            
-            }
+            "program": "${workspaceFolder}/cmd/multiplexer",
+            "args": [
+                "--target",
+                "localhost:1501",
+            ]
+        },
+        {
+            "name": "Start Mock",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/mock",
         }
     ]
 }
