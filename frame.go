@@ -7,13 +7,13 @@ import (
 
 func ReceiveFrame(r io.Reader) ([]byte, error) {
 	var lenbuf [2]byte
-	_, err := r.Read(lenbuf[:])
+	_, err := io.ReadFull(r, lenbuf[:])
 	if err != nil {
 		return nil, err
 	}
 	length := binary.BigEndian.Uint16(lenbuf[:])
 	databuf := make([]byte, length)
-	_, err = r.Read(databuf)
+	_, err = io.ReadFull(r, databuf)
 	if err != nil {
 		return nil, err
 	}
