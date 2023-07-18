@@ -25,5 +25,16 @@
                 "--port", "1501",
             ]
         },
+        {
+            "name": "Send Echo",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/sendecho",
+            "args": [
+                "localhost:1501",
+                "hello_world",
+            ]
+        },
     ]
 }
