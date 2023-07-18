@@ -13,7 +13,7 @@ func main() {
 		flagPort uint16
 	)
 	mainCmd := cobra.Command{
-		Use: "mock [--port <PORT>]",
+		Use: "mock [--host <HOST>] [--port <PORT>]",
 		Run: func(cmd *cobra.Command, args []string) {
 			address := fmt.Sprintf("%s:%d", flagHost, flagPort)
 			err := RunHSMMock(address)

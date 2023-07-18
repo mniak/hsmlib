@@ -11,8 +11,7 @@
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/multiplexer",
             "args": [
-                "--target",
-                "localhost:1501",
+                "--target", "localhost:1501",
             ]
         },
         {
@@ -21,6 +20,10 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/mock",
-        }
+            "args": [
+                "--host", "127.0.0.1",
+                "--port", "1501",
+            ]
+        },
     ]
 }
