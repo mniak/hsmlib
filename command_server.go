@@ -9,12 +9,12 @@ type CommandServer struct {
 }
 
 type CommandHandler interface {
-	Handle(req Command) (Response, error)
+	Handle(req CommandWithHeader) (Response, error)
 }
 
-type CommandHandlerFunc func(Command) (Response, error)
+type CommandHandlerFunc func(CommandWithHeader) (Response, error)
 
-func (h CommandHandlerFunc) Handle(c Command) (Response, error) {
+func (h CommandHandlerFunc) Handle(c CommandWithHeader) (Response, error) {
 	return h(c)
 }
 
@@ -35,7 +35,7 @@ func (s *CommandServer) Serve(listener net.Listener, handler CommandHandler) err
 
 func makePacketHandler(cmdHandler CommandHandler) PacketHandler {
 	return PacketHandlerFunc(func(ps PacketSender, p Packet) error {
-		cmd, err := ParseRawCommand(p.Payload)
+		cmd, err := ParseCommand(p.Payload)
 		if err != nil {
 			return err
 		}
@@ -47,7 +47,7 @@ func makePacketHandler(cmdHandler CommandHandler) PacketHandler {
 
 		respPacket := Packet{
 			Header:  p.Header,
-			Payload: resp.serializeResponse(cmd.Code),
+			Payload: resp.WithCode(cmd.Code).Bytes(),
 		}
 		return ps.SendPacket(respPacket)
 	})

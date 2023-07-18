@@ -3,13 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"encoding/hex"
 	"log"
 	"net"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/mniak/hsmlib"
+	"github.com/mniak/hsmlib/commands"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slog"
 )
 
 func main() {
@@ -28,35 +30,35 @@ func main() {
 			defer conn.Close()
 
 			packet := hsmlib.Packet{
-				Header: binary.BigEndian.AppendUint32(nil, gofakeit.Uint32()),
-				Payload: hsmlib.RawCommand{
-					Code: "B2",
-					Data: []byte(message),
-				}.Bytes(),
+				Header:  binary.BigEndian.AppendUint32(nil, gofakeit.Uint32()),
+				Payload: commands.Echo(message).Bytes(),
 			}
 			err = hsmlib.SendPacket(conn, packet)
 			if err != nil {
 				log.Fatalln(err)
 			}
 
-			reply, err := hsmlib.ReceiveCommand(conn)
+			reply, err := hsmlib.ReceiveResponse(conn)
 			if err != nil {
 				log.Fatalln(err)
 			}
 
-			fmt.Printf("Header: % 2X\n", reply.Header)
-			fmt.Printf("Response Code: %s\n", reply.Code)
-			fmt.Printf("Data: %s\n", string(reply.Data))
+			slog.Info("Received response",
+				"header", hex.EncodeToString(reply.Header),
+				"response_code", reply.ResponseCode,
+				"error_code", reply.ErrorCode,
+				"data", string(reply.Data),
+			)
 
 			if !bytes.Equal(reply.Header, packet.Header) {
 				log.Fatalln("reply header invalid")
 			}
 
-			if len(reply.Data) != len([]byte(message))+2 {
+			if len(reply.Data) != len([]byte(message)) {
 				log.Fatalln("reply data size invalid")
 			}
 
-			if !bytes.Equal(reply.Data[2:], []byte(message)) {
+			if !bytes.Equal(reply.Data, []byte(message)) {
 				log.Fatalln("reply data message invalid")
 			}
 		},

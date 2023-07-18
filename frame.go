@@ -21,11 +21,7 @@ func ReceiveFrame(r io.Reader) ([]byte, error) {
 }
 
 func SendFrame(w io.Writer, payload []byte) error {
-	var lenbuf [2]byte
-	binary.BigEndian.PutUint16(lenbuf[:], uint16(len(payload)))
-
-	result := append(lenbuf[:], payload...)
-
+	result := LengthPrefix2B(payload)
 	_, err := w.Write(result)
 	return err
 }

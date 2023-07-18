@@ -52,11 +52,13 @@ func (m *Multiplexer) HandleConnection(ps hsmlib.PacketSender, packet hsmlib.Pac
 
 	reply, err := m.out.Post(timeoutCtx, packet.Payload)
 	if err != nil {
-		m.Logger.Error("failed to forward message",
-			KConnectionID, connID,
-			KRequestID, packet.Header,
-			KError, err,
-		)
+		if m.Logger != nil {
+			m.Logger.Error("failed to forward message",
+				KConnectionID, connID,
+				KRequestID, packet.Header,
+				KError, err,
+			)
+		}
 		return err
 	}
 	err = ps.SendPacket(hsmlib.Packet{

@@ -9,7 +9,7 @@ import (
 )
 
 func RunHSMMock(address string) error {
-	return hsmlib.ListenAndServe(address, hsmlib.CommandHandlerFunc(func(cmd hsmlib.Command) (reply hsmlib.Response, err error) {
+	return hsmlib.ListenAndServe(address, hsmlib.CommandHandlerFunc(func(cmd hsmlib.CommandWithHeader) (reply hsmlib.Response, err error) {
 		slog.Info("Command received",
 			"command.header", fmt.Sprintf("[% 2X]", cmd.Header),
 			"command.code", cmd.Code,
