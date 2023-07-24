@@ -4,6 +4,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/mniak/hsmlib/adapters/stdlib"
+	"github.com/mniak/hsmlib/multi"
 	"github.com/spf13/cobra"
 )
 
@@ -16,11 +18,10 @@ func main() {
 	mainCmd := cobra.Command{
 		Use: "multiplexer [--listen <address>] [--target <address>] [--timeout <timeout>]",
 		Run: func(cmd *cobra.Command, args []string) {
-			m := Multiplexer{
-				ListenAddress: flagListenAddress,
-				TargetAddress: flagTargetAddress,
-				Timeout:       time.Duration(flagTimeoutSeconds) * time.Second,
-			}
+			m := multi.NewMultiplexer(flagListenAddress, flagTargetAddress,
+				multi.WithLogger(stdlib.NewLogger("[Multiplexer] ")),
+				multi.WithTimeout(time.Duration(flagTimeoutSeconds)*time.Second),
+			)
 			if err := m.Run(); err != nil {
 				log.Fatalln(err)
 			}

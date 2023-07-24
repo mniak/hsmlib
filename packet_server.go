@@ -40,7 +40,7 @@ func (s *PacketServer) ListenAndServe(address string, handler PacketHandler) err
 	return s.Serve(listener, handler)
 }
 
-func (s *PacketServer) Stop() {
+func (s *PacketServer) Shutdown() {
 	close(s.stop)
 }
 

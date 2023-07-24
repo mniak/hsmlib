@@ -10,6 +10,7 @@ import (
 type Reactor struct {
 	IDManager IDManager
 	Stream    io.ReadWriter
+	Logger    log.Logger
 	done      chan struct{}
 }
 
@@ -43,15 +44,15 @@ func (m *Reactor) Start() {
 	}()
 }
 
-func (m *Reactor) receiveOnePacket() {
-	packet, err := ReceivePacket(m.Stream)
+func (r *Reactor) receiveOnePacket() {
+	packet, err := ReceivePacket(r.Stream)
 	if err != nil {
-		log.Println("error receiving frame", err)
+		r.Logger.Println("error receiving frame", err)
 		return
 	}
-	channel, found := m.IDManager.FindChannel(packet.Header)
+	channel, found := r.IDManager.FindChannel(packet.Header)
 	if !found {
-		log.Printf("callback channel not found for id %02X\n", packet.Header)
+		r.Logger.Printf("callback channel not found for id %02X\n", packet.Header)
 		return
 	}
 
@@ -61,17 +62,17 @@ func (m *Reactor) receiveOnePacket() {
 	}()
 }
 
-func (m *Reactor) Stop() {
-	close(m.done)
+func (r *Reactor) Stop() {
+	close(r.done)
 }
 
-func (m *Reactor) Post(ctx context.Context, data []byte) ([]byte, error) {
-	id, ch := m.IDManager.NewID()
+func (r *Reactor) Post(ctx context.Context, data []byte) ([]byte, error) {
+	id, ch := r.IDManager.NewID()
 	packet := Packet{
 		Header:  id,
 		Payload: data,
 	}
-	err := SendPacket(m.Stream, packet)
+	err := SendPacket(r.Stream, packet)
 	if err != nil {
 		return nil, err
 	}

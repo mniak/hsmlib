@@ -30,7 +30,8 @@ func (m *SequentialIDManager) NewID() ([]byte, <-chan []byte) {
 }
 
 func (m *SequentialIDManager) FindChannel(id []byte) (chan<- []byte, bool) {
-	callbackChanI, found := m.ids.Load(id)
+	idnum := binary.BigEndian.Uint32(id)
+	callbackChanI, found := m.ids.Load(idnum)
 	if !found {
 		return nil, false
 	}
