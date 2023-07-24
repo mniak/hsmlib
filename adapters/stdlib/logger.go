@@ -5,8 +5,6 @@ import (
 	"log"
 	"os"
 	"strings"
-
-	"github.com/mniak/hsmlib"
 )
 
 type stdlogger struct {
@@ -14,7 +12,7 @@ type stdlogger struct {
 	errorLogger *log.Logger
 }
 
-func NewLogger(prefix string) hsmlib.Logger {
+func NewLogger(prefix string) stdlogger {
 	return stdlogger{
 		infoLogger:  log.New(os.Stdout, prefix+"INFO ", 0),
 		errorLogger: log.New(os.Stderr, prefix+"ERROR ", 0),

@@ -38,6 +38,7 @@ func WithTimeout(timeout time.Duration) MultiplexerOption {
 func WithLogger(logger hsmlib.Logger) MultiplexerOption {
 	return func(m *Multiplexer) {
 		m.logger = logger
+		m.server.Logger = logger
 	}
 }
 
@@ -68,7 +69,7 @@ func (m *Multiplexer) Run() error {
 
 	m.out = hsmlib.NewReactorFromReadWriter(outConn)
 	m.out.Start()
-	m.logger.Info("reactor started")
+	m.logger.Info("Multiplexer started")
 
 	return m.server.ListenAndServe(m.listenAddress, hsmlib.PacketHandlerFunc(m.HandleConnection))
 }

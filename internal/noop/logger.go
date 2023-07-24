@@ -1,10 +1,8 @@
 package noop
 
-import "github.com/mniak/hsmlib"
-
 type noopLogger struct{}
 
-func Logger() hsmlib.Logger {
+func Logger() noopLogger {
 	return noopLogger{}
 }
 

@@ -1,14 +1,15 @@
 package hsmlib
 
 import (
-	"log"
 	"net"
 
+	"github.com/mniak/hsmlib/internal/noop"
 	"github.com/pkg/errors"
 )
 
 type PacketServer struct {
-	stop chan struct{}
+	Logger Logger
+	stop   chan struct{}
 }
 
 type PacketSender interface {
@@ -31,6 +32,10 @@ func (h PacketHandlerFunc) Handle(ps PacketSender, p Packet) error {
 }
 
 func (s *PacketServer) ListenAndServe(address string, handler PacketHandler) error {
+	if s.Logger == nil {
+		s.Logger = noop.Logger()
+	}
+
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
@@ -54,7 +59,9 @@ func (s *PacketServer) Serve(listener net.Listener, handler PacketHandler) error
 		default:
 			conn, err := listener.Accept()
 			if err != nil {
-				log.Println("failed to accept incoming connection", err)
+				s.Logger.Error("failed to accept incoming connection",
+					"error", err,
+				)
 				return err
 			}
 			go s.handleIncomingConnection(conn, handler)
@@ -65,7 +72,9 @@ func (s *PacketServer) Serve(listener net.Listener, handler PacketHandler) error
 func (s *PacketServer) handleIncomingConnection(conn net.Conn, handler PacketHandler) {
 	err := s.handleIncomingConnectionE(conn, handler)
 	if err != nil {
-		log.Println(errors.WithMessage(err, "failed to receive data"))
+		s.Logger.Error("failed to receive data",
+			"error", err,
+		)
 	}
 }
 
