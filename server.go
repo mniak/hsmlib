@@ -57,7 +57,7 @@ func makePacketHandler(cmdHandler CommandHandler) PacketHandler {
 	})
 }
 
-var DefaultLogger Logger = stdlib.NewLogger("[hsmlib]")
+var DefaultLogger Logger = stdlib.NewLogger("[hsmlib] ")
 
 func ListenAndServeRaw(addr string, handler PacketHandler) error {
 	server := PacketServer{

@@ -68,6 +68,7 @@ func (m *Multiplexer) Run() error {
 	defer outConn.Close()
 
 	reactor := hsmlib.NewReactorFromReadWriter(outConn)
+	reactor.Logger = m.logger
 	reactor.Start()
 	m.out = reactor
 

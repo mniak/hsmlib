@@ -2,9 +2,11 @@ package hsmlib
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"log"
 	"net"
+
+	"github.com/mniak/hsmlib/internal/noop"
 )
 
 type Reactor interface {
@@ -14,7 +16,7 @@ type Reactor interface {
 type _Reactor struct {
 	IDManager IDManager
 	Stream    io.ReadWriter
-	Logger    log.Logger
+	Logger    Logger
 	done      chan struct{}
 }
 
@@ -35,6 +37,10 @@ func NewReactor(target string) (*_Reactor, error) {
 }
 
 func (m *_Reactor) Start() {
+	if m.Logger == nil {
+		m.Logger = noop.Logger()
+	}
+
 	m.done = make(chan struct{})
 	go func() {
 		for {
@@ -51,12 +57,16 @@ func (m *_Reactor) Start() {
 func (r *_Reactor) receiveOnePacket() {
 	packet, err := ReceivePacket(r.Stream)
 	if err != nil {
-		r.Logger.Println("error receiving frame", err)
+		r.Logger.Error("failed to receive frame",
+			"error", err,
+		)
 		return
 	}
 	channel, found := r.IDManager.FindChannel(packet.Header)
 	if !found {
-		r.Logger.Printf("callback channel not found for id %02X\n", packet.Header)
+		r.Logger.Error("callback channel not found",
+			"id", fmt.Sprintf("%2X", packet.Header),
+		)
 		return
 	}
 
