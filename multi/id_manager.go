@@ -12,6 +12,7 @@ type IDManager interface {
 	IDLength() int
 	NewID() ([]byte, <-chan []byte)
 	FindChannel(id []byte) (chan<- []byte, bool)
+	CloseAllChannels()
 }
 
 type SequentialIDManager struct {
@@ -40,4 +41,14 @@ func (m *SequentialIDManager) FindChannel(id []byte) (chan<- []byte, bool) {
 
 	callbackChan := callbackChanI.(chan []byte)
 	return callbackChan, true
+}
+
+func (m *SequentialIDManager) CloseAllChannels() {
+	oldMap := m.ids
+	m.ids = sync.Map{}
+	oldMap.Range(func(key, value any) bool {
+		channel := value.(chan []byte)
+		close(channel)
+		return true
+	})
 }

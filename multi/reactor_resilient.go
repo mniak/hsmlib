@@ -1,7 +1,6 @@
 package multi
 
 import (
-	"context"
 	"io"
 	"net"
 	"sync"
@@ -89,13 +88,13 @@ func (r *_ResilientReactor) reconnectLoop() {
 
 var ReactorDegraded = errors.New("reactor is degraded")
 
-func (r *_ResilientReactor) Post(ctx context.Context, data []byte) ([]byte, error) {
+func (r *_ResilientReactor) Post(data []byte) ([]byte, error) {
 	reactor, healty := r.inner.Value()
 	if !healty {
 		r.logger.Error("not trying to post because reactor is degraded")
 		return nil, ReactorDegraded
 	}
-	resp, err := reactor.Post(ctx, data)
+	resp, err := reactor.Post(data)
 	switch {
 	case err == nil:
 		return resp, err

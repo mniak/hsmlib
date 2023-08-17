@@ -1,9 +1,9 @@
 package multi
 
 import (
-	"context"
 	"io"
-	"sync"
+	"log"
+	"time"
 
 	"github.com/mniak/hsmlib"
 	"github.com/mniak/hsmlib/internal/noop"
@@ -16,9 +16,10 @@ type _SimpleReactor struct {
 	logger           hsmlib.Logger
 	connectionCloser io.Closer
 
-	runLock sync.Mutex
+	used    bool
 	stop    chan struct{}
 	stopped chan struct{}
+	timeout time.Duration
 }
 
 func NewSimpleReactor(rw io.ReadWriteCloser) *_SimpleReactor {
@@ -28,28 +29,29 @@ func NewSimpleReactor(rw io.ReadWriteCloser) *_SimpleReactor {
 		connectionCloser: rw,
 		stop:             make(chan struct{}),
 		stopped:          make(chan struct{}),
+		timeout:          10 * time.Second,
 	}
 	return &reactor
 }
 
 func (r *_SimpleReactor) Start() error {
+	log.Println("Start Begin")
 	if r.logger == nil {
 		r.logger = noop.Logger()
 	}
 
-	canRun := r.runLock.TryLock()
-	if !canRun {
-		return errors.New("reactor is already running")
+	if r.used {
+		return errors.New("a reactor can only be started once. is was already started before.")
 	}
-	defer r.runLock.Unlock()
+	r.used = true
 
-	r.stop = make(chan struct{})
-	r.stopped = make(chan struct{})
 	go func() {
 		defer close(r.stopped)
 		defer r.connectionCloser.Close()
 		r.handleLoop()
+		log.Println("Handle loop stopped. Stopping.")
 	}()
+	log.Println("Start End")
 	return nil
 }
 
@@ -57,13 +59,18 @@ func (r *_SimpleReactor) handleLoop() {
 	for {
 		select {
 		case <-r.stop:
+			log.Println("Stop signal received")
 			return
 		default:
 			err := r.handleSinglePacket()
-			if err != nil {
+			if errors.Is(err, io.EOF) {
+				log.Println("Connection closed. stopping.")
+				return
+			} else if err != nil {
 				r.logger.Error("reactor failed and is stopping",
 					"error", err,
 				)
+				log.Println("Failed to handle packet, so stopping:", err)
 				return
 			}
 		}
@@ -71,6 +78,7 @@ func (r *_SimpleReactor) handleLoop() {
 }
 
 func (r *_SimpleReactor) handleSinglePacket() error {
+	log.Println("Receiving packets")
 	packet, err := r.target.ReceivePacket()
 	if err != nil {
 		return errors.WithMessage(err, "could not receive packet")
@@ -87,31 +95,45 @@ func (r *_SimpleReactor) handleSinglePacket() error {
 	return nil
 }
 
-func (r *_SimpleReactor) Post(ctx context.Context, data []byte) ([]byte, error) {
-	id, ch := r.idManager.NewID()
-	packet := hsmlib.Packet{
-		Header:  id,
-		Payload: data,
-	}
-	err := r.target.SendPacket(packet)
-	if err != nil {
-		return nil, err
-	}
+var ErrResponseTimeout = errors.New("timeout while waiting for response")
 
+func (r *_SimpleReactor) Post(data []byte) ([]byte, error) {
+	timeoutChan := time.After(r.timeout)
+	log.Println("-> POST. stopped chan nil?", r.stopped == nil)
+	defer log.Println("Post stop")
 	select {
 	case <-r.stopped:
+		log.Println("POST Stopped")
 		return nil, errors.New("trying to post into a stopped reactor")
-	case response := <-ch:
-		return response, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	default:
+		log.Println("POST Default")
+		id, ch := r.idManager.NewID()
+		packet := hsmlib.Packet{
+			Header:  id,
+			Payload: data,
+		}
+		err := r.target.SendPacket(packet)
+		if err != nil {
+			return nil, err
+		}
+		for {
+			select {
+			case response := <-ch:
+				return response, nil
+			case <-timeoutChan:
+				return nil, ErrResponseTimeout
+			}
+		}
 	}
 }
 
 func (r *_SimpleReactor) Wait() {
+	log.Println("Wait started")
 	<-r.stopped
+	log.Println("Wait finished")
 }
 
 func (r *_SimpleReactor) Stop() {
+	log.Println("Stopping")
 	close(r.stop)
 }

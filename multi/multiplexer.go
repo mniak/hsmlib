@@ -1,7 +1,6 @@
 package multi
 
 import (
-	"context"
 	"sync/atomic"
 	"time"
 
@@ -75,10 +74,7 @@ func (m *Multiplexer) Run() error {
 func (m *Multiplexer) HandleConnection(in hsmlib.PacketSender, packet hsmlib.Packet) error {
 	connID := m.connectionIDs.Add(1)
 
-	timeoutCtx, cancelCtx := context.WithTimeout(context.Background(), m.timeout)
-	defer cancelCtx()
-
-	reply, err := m.out.Post(timeoutCtx, packet.Payload)
+	reply, err := m.out.Post(packet.Payload)
 	if err != nil {
 		m.logger.Error("failed to forward message",
 			KConnectionID, connID,
