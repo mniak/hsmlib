@@ -1,8 +1,13 @@
 package hsmlib
 
-import "net"
+import (
+	"net"
+
+	"github.com/mniak/hsmlib/adapters/stdlib"
+)
 
 type CommandServer struct {
+	Logger       Logger
 	packetServer PacketServer
 }
 
@@ -28,6 +33,7 @@ func (s *CommandServer) ListenAndServe(address string, handler CommandHandler) e
 
 func (s *CommandServer) Serve(listener net.Listener, handler CommandHandler) error {
 	packetHandler := makePacketHandler(handler)
+	s.packetServer.Logger = s.Logger
 	return s.packetServer.Serve(listener, packetHandler)
 }
 
@@ -51,12 +57,18 @@ func makePacketHandler(cmdHandler CommandHandler) PacketHandler {
 	})
 }
 
+var DefaultLogger Logger = stdlib.NewLogger("[hsmlib]")
+
 func ListenAndServeRaw(addr string, handler PacketHandler) error {
-	server := PacketServer{}
+	server := PacketServer{
+		Logger: DefaultLogger,
+	}
 	return server.ListenAndServe(addr, handler)
 }
 
 func ListenAndServe(addr string, handler CommandHandler) error {
-	server := CommandServer{}
+	server := CommandServer{
+		Logger: DefaultLogger,
+	}
 	return server.ListenAndServe(addr, handler)
 }

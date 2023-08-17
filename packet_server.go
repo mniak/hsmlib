@@ -32,10 +32,6 @@ func (h PacketHandlerFunc) Handle(ps PacketSender, p Packet) error {
 }
 
 func (s *PacketServer) ListenAndServe(address string, handler PacketHandler) error {
-	if s.Logger == nil {
-		s.Logger = noop.Logger()
-	}
-
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
@@ -50,6 +46,10 @@ func (s *PacketServer) Shutdown() {
 }
 
 func (s *PacketServer) Serve(listener net.Listener, handler PacketHandler) error {
+	if s.Logger == nil {
+		s.Logger = noop.Logger()
+	}
+
 	s.stop = make(chan struct{})
 
 	for {
@@ -59,11 +59,14 @@ func (s *PacketServer) Serve(listener net.Listener, handler PacketHandler) error
 		default:
 			conn, err := listener.Accept()
 			if err != nil {
-				s.Logger.Error("failed to accept incoming connection",
+				s.Logger.Error("Failed to accept incoming connection",
 					"error", err,
 				)
 				return err
 			}
+			s.Logger.Info("Connection accepted",
+				"addr", conn.RemoteAddr().String(),
+			)
 			go s.handleIncomingConnection(conn, handler)
 		}
 	}
