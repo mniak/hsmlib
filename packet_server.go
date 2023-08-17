@@ -1,15 +1,32 @@
 package hsmlib
 
 import (
+	"fmt"
+	"io"
 	"net"
 
 	"github.com/mniak/hsmlib/internal/noop"
 	"github.com/pkg/errors"
 )
 
-type PacketServer struct {
-	Logger Logger
+type PacketServer interface {
+	Serve(listener net.Listener, handler PacketHandler) (serveError error)
+	Shutdown()
+}
+
+type _PacketServer struct {
+	logger Logger
 	stop   chan struct{}
+}
+
+func NewPacketServer(logger Logger) *_PacketServer {
+	s := _PacketServer{
+		logger: logger,
+	}
+	if s.logger == nil {
+		s.logger = noop.Logger()
+	}
+	return &s
 }
 
 type PacketSender interface {
@@ -31,40 +48,34 @@ func (h PacketHandlerFunc) Handle(ps PacketSender, p Packet) error {
 	return h(ps, p)
 }
 
-func (s *PacketServer) ListenAndServe(address string, handler PacketHandler) error {
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		return err
-	}
-	defer listener.Close()
-
-	return s.Serve(listener, handler)
-}
-
-func (s *PacketServer) Shutdown() {
+func (s *_PacketServer) Shutdown() {
 	close(s.stop)
 }
 
-func (s *PacketServer) Serve(listener net.Listener, handler PacketHandler) error {
-	if s.Logger == nil {
-		s.Logger = noop.Logger()
-	}
-
+func (s *_PacketServer) Serve(listener net.Listener, handler PacketHandler) (serveError error) {
 	s.stop = make(chan struct{})
+
+	defer func() {
+		rec := recover()
+		if rec != nil {
+			serveError = errors.New(fmt.Sprint(rec))
+		}
+	}()
 
 	for {
 		select {
 		case <-s.stop:
+			s.logger.Info("Server stopped gracefully")
 			return nil
 		default:
 			conn, err := listener.Accept()
 			if err != nil {
-				s.Logger.Error("Failed to accept incoming connection",
+				s.logger.Error("Failed to accept incoming connection",
 					"error", err,
 				)
 				return err
 			}
-			s.Logger.Info("Connection accepted",
+			s.logger.Info("Connection accepted",
 				"addr", conn.RemoteAddr().String(),
 			)
 			go s.handleIncomingConnection(conn, handler)
@@ -72,25 +83,29 @@ func (s *PacketServer) Serve(listener net.Listener, handler PacketHandler) error
 	}
 }
 
-func (s *PacketServer) handleIncomingConnection(conn net.Conn, handler PacketHandler) {
+func (s *_PacketServer) handleIncomingConnection(conn net.Conn, handler PacketHandler) {
+	defer conn.Close()
 	err := s.handleIncomingConnectionE(conn, handler)
-	if err != nil {
-		s.Logger.Error("failed to receive data",
+	if err != nil && errors.Is(err, io.EOF) {
+		s.logger.Error("failed to receive data",
 			"error", err,
 		)
 	}
 }
 
-func (s *PacketServer) handleIncomingConnectionE(conn net.Conn, handler PacketHandler) error {
-	defer conn.Close()
+var ErrClientConnClosed = errors.WithMessage(io.EOF, "client connection was closed")
 
-	packet, err := ReceivePacket(conn)
+func (s *_PacketServer) handleIncomingConnectionE(in net.Conn, handler PacketHandler) error {
+	packet, err := ReceivePacket(in)
+	if errors.Is(err, io.EOF) {
+		return ErrClientConnClosed
+	}
 	if err != nil {
 		return err
 	}
 
 	sender := PacketSenderFunc(func(p Packet) error {
-		return SendPacket(conn, p)
+		return SendPacket(in, p)
 	})
 
 	err = handler.Handle(sender, packet)

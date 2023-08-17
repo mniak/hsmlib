@@ -37,8 +37,11 @@ func WithTimeout(timeout time.Duration) MultiplexerOption {
 
 func WithLogger(logger hsmlib.Logger) MultiplexerOption {
 	return func(m *Multiplexer) {
-		m.logger = logger
-		m.server.Logger = logger
+		if logger == nil {
+			m.logger = noop.Logger()
+		} else {
+			m.logger = logger
+		}
 	}
 }
 
@@ -48,11 +51,12 @@ func NewMultiplexer(listenAddr, targetAddr string, opts ...MultiplexerOption) *M
 	result := &Multiplexer{
 		listenAddress: listenAddr,
 		targetAddress: targetAddr,
-		logger:        noop.Logger(),
 	}
 	for _, opt := range opts {
 		opt(result)
 	}
+
+	result.server = hsmlib.NewPacketServer(result.logger)
 	return result
 }
 
@@ -74,7 +78,8 @@ func (m *Multiplexer) Run() error {
 
 	m.logger.Info("Multiplexer started")
 
-	return m.server.ListenAndServe(m.listenAddress, hsmlib.PacketHandlerFunc(m.HandleConnection))
+	packetHandler := hsmlib.PacketHandler(hsmlib.PacketHandlerFunc(m.HandleConnection))
+	return hsmlib.ListenAndServeI(m.server, m.listenAddress, packetHandler)
 }
 
 func (m *Multiplexer) HandleConnection(ps hsmlib.PacketSender, packet hsmlib.Packet) error {
