@@ -2,12 +2,13 @@ package multi
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/mniak/hsmlib"
 	"github.com/mniak/hsmlib/internal/noop"
+	"github.com/pkg/errors"
 )
 
 type Reactor interface {
@@ -15,17 +16,21 @@ type Reactor interface {
 }
 
 type _Reactor struct {
-	IDManager IDManager
-	// Stream    io.ReadWriter
-	PacketStream hsmlib.PacketStream
-	Logger       hsmlib.Logger
-	done         chan struct{}
+	idManager IDManager
+	target    hsmlib.PacketStream
+	logger    hsmlib.Logger
+	closer    io.Closer
+
+	run     sync.Mutex
+	stop    chan struct{}
+	stopped chan struct{}
 }
 
-func NewReactorFromReadWriter(rw io.ReadWriter) *_Reactor {
+func NewReactorFromReadWriter(rw io.ReadWriteCloser) *_Reactor {
 	reactor := _Reactor{
-		IDManager:    &SequentialIDManager{},
-		PacketStream: hsmlib.NewPacketStream(rw),
+		idManager: &SequentialIDManager{},
+		target:    hsmlib.NewPacketStream(rw),
+		closer:    rw,
 	}
 	return &reactor
 }
@@ -38,56 +43,64 @@ func NewReactor(target string) (*_Reactor, error) {
 	return NewReactorFromReadWriter(conn), nil
 }
 
-func (m *_Reactor) Start() {
-	if m.Logger == nil {
-		m.Logger = noop.Logger()
+func (r *_Reactor) Start() error {
+	if r.logger == nil {
+		r.logger = noop.Logger()
 	}
 
-	m.done = make(chan struct{})
+	canRun := r.run.TryLock()
+	if !canRun {
+		return errors.New("reactor is already running")
+	}
+	defer r.run.Unlock()
+
+	r.stop = make(chan struct{})
+	r.stopped = make(chan struct{})
 	go func() {
+		defer close(r.stopped)
+		defer r.closer.Close()
 		for {
 			select {
-			case <-m.done:
+			case <-r.stop:
+				return
 			default:
-				m.receiveOnePacket()
+				err := r.handleOnPacket()
+				if err != nil {
+					r.logger.Error("reactor failed and is stopping",
+						"error", err,
+					)
+					return
+				}
 			}
 		}
 	}()
+	return nil
 }
 
-func (r *_Reactor) receiveOnePacket() {
-	packet, err := r.PacketStream.ReceivePacket()
+func (r *_Reactor) handleOnPacket() error {
+	packet, err := r.target.ReceivePacket()
 	if err != nil {
-		r.Logger.Error("failed to receive frame",
-			"error", err,
-		)
-		return
+		return errors.WithMessage(err, "could not receive packet")
 	}
-	channel, found := r.IDManager.FindChannel(packet.Header)
+	channel, found := r.idManager.FindChannel(packet.Header)
 	if !found {
-		r.Logger.Error("callback channel not found",
-			"id", fmt.Sprintf("%2X", packet.Header),
-		)
-		return
+		return errors.WithMessagef(err, "callback channel '%2X' not found", packet.Header)
 	}
 
 	go func() {
 		channel <- packet.Payload
 		close(channel)
 	}()
-}
-
-func (r *_Reactor) Stop() {
-	close(r.done)
+	return nil
 }
 
 func (r *_Reactor) Post(ctx context.Context, data []byte) ([]byte, error) {
-	id, ch := r.IDManager.NewID()
+	id, ch := r.idManager.NewID()
 	packet := hsmlib.Packet{
 		Header:  id,
 		Payload: data,
 	}
-	err := r.PacketStream.SendPacket(packet)
+	err := r.target.SendPacket(packet)
 	if err != nil {
 		return nil, err
 	}
@@ -98,4 +111,12 @@ func (r *_Reactor) Post(ctx context.Context, data []byte) ([]byte, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+func (r *_Reactor) Wait() {
+	<-r.stopped
+}
+
+func (r *_Reactor) Stop() {
+	close(r.stop)
 }

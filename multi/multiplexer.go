@@ -72,7 +72,7 @@ func (m *Multiplexer) Run() error {
 	defer outConn.Close()
 
 	reactor := NewReactorFromReadWriter(outConn)
-	reactor.Logger = m.logger
+	reactor.logger = m.logger
 	reactor.Start()
 	m.out = reactor
 
