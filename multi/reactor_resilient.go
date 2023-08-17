@@ -15,19 +15,20 @@ type _ResilientReactor struct {
 	target string
 	logger hsmlib.Logger
 
-	inner         Degradable[Reactor]
-	runLock       sync.Mutex
-	retryStrategy RetryStrategy
-	stop          chan struct{}
-	stopped       chan struct{}
-	ractorFactory ReactorFactory
+	inner          Degradable[Reactor]
+	runLock        sync.Mutex
+	retryStrategy  RetryStrategy
+	stop           chan struct{}
+	stopped        chan struct{}
+	reactorFactory ReactorFactory
 }
 
 func NewResilientReactor(target string, logger hsmlib.Logger) *_ResilientReactor {
 	r := _ResilientReactor{
-		target:        target,
-		retryStrategy: SimpleDelayRetryStrategy(1 * time.Second),
-		logger:        logger,
+		target:         target,
+		retryStrategy:  SimpleDelayRetryStrategy(1 * time.Second),
+		logger:         logger,
+		reactorFactory: TCPReactorFactory(),
 	}
 	if r.logger == nil {
 		r.logger = noop.Logger()
@@ -55,7 +56,7 @@ func (r *_ResilientReactor) connectAndSaveReactor(withRetry bool) error {
 		inner.Stop()
 	}
 
-	reactor, err := r.ractorFactory(r.target, withRetry)
+	reactor, err := r.reactorFactory(r.target, withRetry)
 	if err != nil {
 		return err
 	}
