@@ -1,9 +1,11 @@
-package hsmlib
+package multi
 
 import (
 	"encoding/binary"
 	"sync"
 	"sync/atomic"
+
+	"github.com/mniak/hsmlib"
 )
 
 type IDManager interface {
@@ -18,7 +20,7 @@ type SequentialIDManager struct {
 }
 
 func (m *SequentialIDManager) IDLength() int {
-	return HeaderLength
+	return hsmlib.HeaderLength
 }
 
 func (m *SequentialIDManager) NewID() ([]byte, <-chan []byte) {

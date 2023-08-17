@@ -29,15 +29,6 @@ func NewPacketServer(logger Logger) *_PacketServer {
 	return &s
 }
 
-type PacketSender interface {
-	SendPacket(Packet) error
-}
-type PacketSenderFunc func(Packet) error
-
-func (fn PacketSenderFunc) SendPacket(p Packet) error {
-	return fn(p)
-}
-
 type PacketHandler interface {
 	Handle(PacketSender, Packet) error
 }
@@ -83,32 +74,26 @@ func (s *_PacketServer) Serve(listener net.Listener, handler PacketHandler) (ser
 	}
 }
 
-func (s *_PacketServer) handleIncomingConnection(conn net.Conn, handler PacketHandler) {
+// var ErrClientConnClosed = errors.WithMessage(io.EOF, "client connection was closed")
+
+func (s *_PacketServer) handleIncomingConnection(conn io.ReadWriteCloser, handler PacketHandler) {
 	defer conn.Close()
 	err := s.handleIncomingConnectionE(conn, handler)
-	if err != nil && errors.Is(err, io.EOF) {
+	if err != nil {
 		s.logger.Error("failed to receive data",
 			"error", err,
 		)
 	}
 }
 
-var ErrClientConnClosed = errors.WithMessage(io.EOF, "client connection was closed")
-
-func (s *_PacketServer) handleIncomingConnectionE(in net.Conn, handler PacketHandler) error {
-	packet, err := ReceivePacket(in)
-	if errors.Is(err, io.EOF) {
-		return ErrClientConnClosed
-	}
+func (s *_PacketServer) handleIncomingConnectionE(conn io.ReadWriteCloser, handler PacketHandler) error {
+	packetStream := NewPacketStream(conn)
+	packet, err := packetStream.ReceivePacket()
 	if err != nil {
 		return err
 	}
 
-	sender := PacketSenderFunc(func(p Packet) error {
-		return SendPacket(in, p)
-	})
-
-	err = handler.Handle(sender, packet)
+	err = handler.Handle(packetStream, packet)
 	if err != nil {
 		return errors.WithMessage(err, "failed to handle packet")
 	}

@@ -15,7 +15,6 @@ func ListenAndServeFn[T any](serve ServeFunc[T], address string, handler T) erro
 		return err
 	}
 	defer listener.Close()
-
 	return serve(listener, handler)
 }
 
@@ -25,6 +24,5 @@ func ListenAndServeI[T any](server ServeI[T], address string, t T) error {
 		return err
 	}
 	defer listener.Close()
-
 	return server.Serve(listener, t)
 }

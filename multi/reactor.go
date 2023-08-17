@@ -1,4 +1,4 @@
-package hsmlib
+package multi
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/mniak/hsmlib"
 	"github.com/mniak/hsmlib/internal/noop"
 )
 
@@ -15,15 +16,16 @@ type Reactor interface {
 
 type _Reactor struct {
 	IDManager IDManager
-	Stream    io.ReadWriter
-	Logger    Logger
-	done      chan struct{}
+	// Stream    io.ReadWriter
+	PacketStream hsmlib.PacketStream
+	Logger       hsmlib.Logger
+	done         chan struct{}
 }
 
 func NewReactorFromReadWriter(rw io.ReadWriter) *_Reactor {
 	reactor := _Reactor{
-		IDManager: &SequentialIDManager{},
-		Stream:    rw,
+		IDManager:    &SequentialIDManager{},
+		PacketStream: hsmlib.NewPacketStream(rw),
 	}
 	return &reactor
 }
@@ -46,7 +48,6 @@ func (m *_Reactor) Start() {
 		for {
 			select {
 			case <-m.done:
-				return
 			default:
 				m.receiveOnePacket()
 			}
@@ -55,7 +56,7 @@ func (m *_Reactor) Start() {
 }
 
 func (r *_Reactor) receiveOnePacket() {
-	packet, err := ReceivePacket(r.Stream)
+	packet, err := r.PacketStream.ReceivePacket()
 	if err != nil {
 		r.Logger.Error("failed to receive frame",
 			"error", err,
@@ -82,11 +83,11 @@ func (r *_Reactor) Stop() {
 
 func (r *_Reactor) Post(ctx context.Context, data []byte) ([]byte, error) {
 	id, ch := r.IDManager.NewID()
-	packet := Packet{
+	packet := hsmlib.Packet{
 		Header:  id,
 		Payload: data,
 	}
-	err := SendPacket(r.Stream, packet)
+	err := r.PacketStream.SendPacket(packet)
 	if err != nil {
 		return nil, err
 	}

@@ -1,3 +1,3 @@
-package hsmlib
+package multi
 
 var _ Reactor = &_Reactor{}

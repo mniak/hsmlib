@@ -23,7 +23,7 @@ type Multiplexer struct {
 	logger        hsmlib.Logger
 	server        hsmlib.PacketServer
 
-	out           hsmlib.Reactor
+	out           Reactor
 	connectionIDs atomic.Uint64
 }
 
@@ -71,7 +71,7 @@ func (m *Multiplexer) Run() error {
 	}
 	defer outConn.Close()
 
-	reactor := hsmlib.NewReactorFromReadWriter(outConn)
+	reactor := NewReactorFromReadWriter(outConn)
 	reactor.Logger = m.logger
 	reactor.Start()
 	m.out = reactor

@@ -16,9 +16,6 @@ func (h CommandHandlerFunc) Handle(cmd CommandWithHeader) (Response, error) {
 	return h(cmd)
 }
 
-//	type CommandServer interface {
-//		Serve(listener net.Listener, handler CommandHandler) error
-//	}
 type CommandServer struct {
 	Logger       Logger
 	packetServer PacketServer
