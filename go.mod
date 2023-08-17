@@ -5,8 +5,8 @@ go 1.20
 require (
 	github.com/brianvoe/gofakeit/v6 v6.22.0
 	github.com/pkg/errors v0.9.1
-	github.com/samber/lo v1.38.1
 	github.com/spf13/cobra v1.7.0
+	go.uber.org/multierr v1.11.0
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 )
 

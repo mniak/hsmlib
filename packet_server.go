@@ -74,12 +74,10 @@ func (s *_PacketServer) Serve(listener net.Listener, handler PacketHandler) (ser
 	}
 }
 
-// var ErrClientConnClosed = errors.WithMessage(io.EOF, "client connection was closed")
-
 func (s *_PacketServer) handleIncomingConnection(conn io.ReadWriteCloser, handler PacketHandler) {
 	defer func() {
+		s.logger.Info("Closing incoming client connection")
 		conn.Close()
-		s.logger.Info("Incoming client connection closed")
 	}()
 	err := s.handleIncomingConnectionE(conn, handler)
 	if err != nil {

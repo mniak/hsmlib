@@ -41,6 +41,13 @@ func (r ResponseWithCode) Bytes() []byte {
 	return buf.Bytes()
 }
 
+func (r ResponseWithCode) WithHeader(header []byte) ResponseWithHeader {
+	return ResponseWithHeader{
+		Header:           header,
+		ResponseWithCode: r,
+	}
+}
+
 func ParseResponse(data []byte) (ResponseWithCode, error) {
 	const codeLength = 2
 	const errorCodeLength = 2
@@ -83,4 +90,11 @@ func ReceiveResponse(r io.Reader) (ResponseWithHeader, error) {
 		ResponseWithCode: respC,
 	}
 	return respH, err
+}
+
+func (r ResponseWithHeader) AsPacket() Packet {
+	return Packet{
+		Header:  r.Header,
+		Payload: r.ResponseWithCode.Bytes(),
+	}
 }

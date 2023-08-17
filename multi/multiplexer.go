@@ -2,12 +2,12 @@ package multi
 
 import (
 	"context"
-	"net"
 	"sync/atomic"
 	"time"
 
 	"github.com/mniak/hsmlib"
 	"github.com/mniak/hsmlib/internal/noop"
+	"go.uber.org/multierr"
 )
 
 const (
@@ -37,43 +37,33 @@ func WithTimeout(timeout time.Duration) MultiplexerOption {
 
 func WithLogger(logger hsmlib.Logger) MultiplexerOption {
 	return func(m *Multiplexer) {
-		if logger == nil {
-			m.logger = noop.Logger()
-		} else {
-			m.logger = logger
-		}
+		m.logger = logger
 	}
 }
 
 var DefaultTimout = 10 * time.Second
 
 func NewMultiplexer(listenAddr, targetAddr string, opts ...MultiplexerOption) *Multiplexer {
-	result := &Multiplexer{
+	m := &Multiplexer{
 		listenAddress: listenAddr,
 		targetAddress: targetAddr,
 	}
 	for _, opt := range opts {
-		opt(result)
+		opt(m)
 	}
 
-	result.server = hsmlib.NewPacketServer(result.logger)
-	return result
+	if m.logger == nil {
+		m.logger = noop.Logger()
+	}
+	m.server = hsmlib.NewPacketServer(m.logger)
+	return m
 }
 
 func (m *Multiplexer) Run() error {
-	outaddr, err := net.ResolveTCPAddr("tcp", m.targetAddress)
-	if err != nil {
+	reactor := NewResilientReactor(m.targetAddress, m.logger)
+	if err := reactor.Start(); err != nil {
 		return err
 	}
-	outConn, err := net.DialTCP("tcp", nil, outaddr)
-	if err != nil {
-		return err
-	}
-	defer outConn.Close()
-
-	reactor := NewReactorFromReadWriter(outConn)
-	reactor.logger = m.logger
-	reactor.Start()
 	m.out = reactor
 
 	m.logger.Info("Multiplexer started")
@@ -82,7 +72,7 @@ func (m *Multiplexer) Run() error {
 	return hsmlib.ListenAndServeI(m.server, m.listenAddress, packetHandler)
 }
 
-func (m *Multiplexer) HandleConnection(ps hsmlib.PacketSender, packet hsmlib.Packet) error {
+func (m *Multiplexer) HandleConnection(in hsmlib.PacketSender, packet hsmlib.Packet) error {
 	connID := m.connectionIDs.Add(1)
 
 	timeoutCtx, cancelCtx := context.WithTimeout(context.Background(), m.timeout)
@@ -90,20 +80,42 @@ func (m *Multiplexer) HandleConnection(ps hsmlib.PacketSender, packet hsmlib.Pac
 
 	reply, err := m.out.Post(timeoutCtx, packet.Payload)
 	if err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to forward message",
-				KConnectionID, connID,
-				KRequestID, packet.Header,
-				KError, err,
-			)
-		}
+		m.logger.Error("failed to forward message",
+			KConnectionID, connID,
+			KRequestID, packet.Header,
+			KError, err,
+		)
+		err = m.sendFailureResponse(in, packet, err)
 		return err
 	}
-	err = ps.SendPacket(hsmlib.Packet{
+	err = in.SendPacket(hsmlib.Packet{
 		Header:  packet.Header,
 		Payload: reply,
 	})
 	return err
+}
+
+func (m *Multiplexer) sendFailureResponse(in hsmlib.PacketSender, packet hsmlib.Packet, err error) error {
+	cmd, err2 := hsmlib.ParseCommand(packet.Payload)
+	if err2 != nil {
+		return multierr.Combine(err, err2)
+	}
+	resp := hsmlib.Response{
+		ErrorCode: "99",
+		Data:      []byte(err.Error()),
+	}
+	respPacket := resp.WithCode(cmd.Code).
+		WithHeader(packet.Header).
+		AsPacket()
+
+	err2 = in.SendPacket(hsmlib.Packet{
+		Header:  packet.Header,
+		Payload: respPacket.Bytes(),
+	})
+	if err2 != nil {
+		return multierr.Combine(err, err2)
+	}
+	return nil
 }
 
 func (m *Multiplexer) Shutdown() {

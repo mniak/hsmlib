@@ -47,7 +47,7 @@ func getArgMap(args ...any) map[string]any {
 }
 
 func formatArgs(args ...any) string {
-	var sb strings.Builder
+	var pairs []string
 	for len(args) > 0 {
 		key := fmt.Sprint(args[0])
 		args = args[1:]
@@ -58,7 +58,7 @@ func formatArgs(args ...any) string {
 			args = args[1:]
 
 		}
-		fmt.Fprintf(&sb, "%s=%s", key, value)
+		pairs = append(pairs, fmt.Sprintf("%s=%s", key, value))
 	}
-	return sb.String()
+	return strings.Join(pairs, " ")
 }
