@@ -1,6 +1,7 @@
 package multi
 
 import (
+	"context"
 	"io"
 	"net"
 	"sync"
@@ -8,78 +9,87 @@ import (
 
 	"github.com/mniak/hsmlib"
 	"github.com/mniak/hsmlib/internal/noop"
+	"github.com/mniak/hsmlib/retry"
 	"github.com/pkg/errors"
 )
 
-type _ResilientReactor struct {
-	target string
-	logger hsmlib.Logger
+type ResilientReactor struct {
+	Logger            hsmlib.Logger
+	RetryStrategy     retry.Strategy
+	ConnectionTimeout time.Duration
 
-	inner          Degradable[Reactor]
-	runLock        sync.Mutex
-	retryStrategy  RetryStrategy
-	stop           chan struct{}
-	stopped        chan struct{}
-	reactorFactory ReactorFactory
+	degradableReactor Degradable[Reactor]
+	runLock           sync.Mutex
+	stop              chan struct{}
+	stopped           chan struct{}
 }
 
-func NewResilientReactor(target string, logger hsmlib.Logger) *_ResilientReactor {
-	r := _ResilientReactor{
-		target:         target,
-		retryStrategy:  SimpleDelayRetryStrategy(1 * time.Second),
-		logger:         logger,
-		reactorFactory: TCPReactorFactory(),
+func (r *ResilientReactor) ensureInit() {
+	r.stop = make(chan struct{})
+	r.stop = make(chan struct{})
+
+	if r.Logger == nil {
+		r.Logger = noop.Logger()
 	}
-	if r.logger == nil {
-		r.logger = noop.Logger()
+	if r.RetryStrategy == nil {
+		r.RetryStrategy = retry.SimpleDelayStrategy(1 * time.Second)
 	}
-	return &r
 }
 
-func (r *_ResilientReactor) Start() error {
+func (r *ResilientReactor) Start(dialer Dialer) error {
+	r.ensureInit()
+
 	canRun := r.runLock.TryLock()
 	if !canRun {
 		return errors.New("reactor is already running")
 	}
-	if err := r.connectAndSaveReactor(false); err != nil {
+	if err := r.connectAndSaveReactor(dialer, false); err != nil {
 		return errors.WithMessage(err, "first connection did not work")
 	}
 	go func() {
 		defer r.runLock.Unlock()
-		r.reconnectLoop()
+		r.reconnectLoop(dialer)
 	}()
 	return nil
 }
 
-func (r *_ResilientReactor) connectAndSaveReactor(withRetry bool) error {
-	if inner, _ := r.inner.Value(); inner != nil {
+func (r *ResilientReactor) connectAndSaveReactor(dialer Dialer, withRetry bool) error {
+	if inner, _ := r.degradableReactor.Value(); inner != nil {
 		inner.Stop()
 	}
 
-	reactor, err := r.reactorFactory(r.target, withRetry)
+	ctx, _ := context.WithTimeout(context.Background(), DefaultTimeout)
+	conn, err := dialer.DialContext(ctx)
 	if err != nil {
 		return err
 	}
-	r.logger.Info("connect() worked. resetting degradable.")
+	reactor := SimpleReactor{
+		Target: hsmlib.NewPacketStream(conn),
+	}
+	err = reactor.Start()
+	if err != nil {
+		return err
+	}
+	r.Logger.Info("connect() worked. resetting degradable.")
 
 	go func() {
 		reactor.Wait()
-		r.inner.SetDegraded()
+		r.degradableReactor.SetDegraded()
 	}()
-	r.inner.Reset(reactor)
+	r.degradableReactor.Reset(&reactor)
 	return nil
 }
 
-func (r *_ResilientReactor) reconnectLoop() {
+func (r *ResilientReactor) reconnectLoop(dialer Dialer) {
 	for {
 		select {
 		case <-r.stop:
 			return
-		case <-r.inner.WhenDegraded():
-			r.logger.Error("detected degraded reactor. trying to reconnect.")
-			err := r.connectAndSaveReactor(true)
+		case <-r.degradableReactor.WhenDegraded():
+			r.Logger.Error("detected degraded reactor. trying to reconnect.")
+			err := r.connectAndSaveReactor(dialer, true)
 			if err != nil {
-				r.logger.Error("failed to reconnect",
+				r.Logger.Error("failed to reconnect",
 					"error", err,
 				)
 			}
@@ -89,34 +99,34 @@ func (r *_ResilientReactor) reconnectLoop() {
 
 var ReactorDegraded = errors.New("reactor is degraded")
 
-func (r *_ResilientReactor) Post(data []byte) ([]byte, error) {
-	reactor, healty := r.inner.Value()
+func (self *ResilientReactor) Post(data []byte) ([]byte, error) {
+	reactor, healty := self.degradableReactor.Value()
 	if !healty {
-		r.logger.Error("not trying to post because reactor is degraded")
+		self.Logger.Error("not trying to post because reactor is degraded")
 		return nil, ReactorDegraded
 	}
 	resp, err := reactor.Post(data)
 	switch {
 	case err == nil:
-		return resp, err
+		return resp, nil
 	case errors.Is(err, io.EOF), errors.Is(err, net.ErrClosed):
-		r.logger.Error("post failed. marking reactor as degraded",
+		self.Logger.Error("post failed. marking reactor as degraded",
 			"error", err,
 		)
-		r.inner.SetDegraded()
+		self.degradableReactor.SetDegraded()
 		return resp, ReactorDegraded
 	default:
-		r.logger.Error("post failed",
+		self.Logger.Error("post failed",
 			"error", err,
 		)
 		return resp, err
 	}
 }
 
-func (r *_ResilientReactor) Wait() {
-	<-r.stopped
+func (self *ResilientReactor) Wait() {
+	<-self.stopped
 }
 
-func (r *_ResilientReactor) Stop() {
-	close(r.stop)
+func (self *ResilientReactor) Stop() {
+	close(self.stop)
 }

@@ -13,7 +13,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-var _ Reactor = &_SimpleReactor{}
+var _ Reactor = &SimpleReactor{}
 
 func TestSimpleReactor_HappyPath_SingleRequest(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -42,13 +42,12 @@ func TestSimpleReactor_HappyPath_SingleRequest(t *testing.T) {
 	mockIDManager.EXPECT().FindChannel(fakeResponse.Header).Return(fakeResponseChan, true)
 	mockCloser.EXPECT().Close()
 
-	reactor := NewSimpleReactor(nil)
+	reactor := SimpleReactor{}
 	require.NotNil(t, reactor)
 	require.NotEmpty(t, reactor)
 
-	reactor.idManager = mockIDManager
-	reactor.target = mockPacketStream
-	reactor.connectionCloser = mockCloser
+	reactor.IDManager = mockIDManager
+	reactor.Target = mockPacketStream
 
 	err := reactor.Start()
 	require.NoError(t, err)
@@ -66,7 +65,6 @@ func TestSimpleReactor_HappyPath_TwoRequests(t *testing.T) {
 
 	mockIDManager := mocks.NewMockIDManager(ctrl)
 	mockPacketStream := mocks.NewMockPacketStream(ctrl)
-	mockCloser := mocks.NewMockCloser(ctrl)
 
 	fakeRequest1 := hsmlib.Packet{
 		Header:  []byte(gofakeit.Lexify("????")),
@@ -100,15 +98,11 @@ func TestSimpleReactor_HappyPath_TwoRequests(t *testing.T) {
 	mockPacketStream.EXPECT().ReceivePacket().Return(hsmlib.Packet{}, io.EOF)
 	mockIDManager.EXPECT().FindChannel(fakeResponse1.Header).Return(fakeResponseChan1, true)
 	mockIDManager.EXPECT().FindChannel(fakeResponse2.Header).Return(fakeResponseChan2, true)
-	mockCloser.EXPECT().Close()
 
-	reactor := NewSimpleReactor(nil)
-	require.NotNil(t, reactor)
-	require.NotEmpty(t, reactor)
-
-	reactor.idManager = mockIDManager
-	reactor.target = mockPacketStream
-	reactor.connectionCloser = mockCloser
+	reactor := SimpleReactor{
+		IDManager: mockIDManager,
+		Target:    mockPacketStream,
+	}
 
 	err := reactor.Start()
 	require.NoError(t, err)

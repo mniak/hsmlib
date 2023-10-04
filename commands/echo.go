@@ -2,9 +2,22 @@ package commands
 
 import "github.com/mniak/hsmlib"
 
-func Echo(message string) hsmlib.Command {
-	return hsmlib.Command{
-		Code: "B2",
-		Data: hsmlib.LengthPrefix4H([]byte(message)),
+func MakeEcho(message string) hsmlib.Command {
+	return Echo{
+		Message: message,
 	}
 }
+
+type Echo struct {
+	Message string
+}
+
+func (e Echo) Code() []byte {
+	return []byte("B2")
+}
+
+func (e Echo) Data() []byte {
+	return hsmlib.LengthPrefix4H([]byte(e.Message))
+}
+
+type EchoResponse struct{}

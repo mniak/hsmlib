@@ -1,2 +1,7 @@
-__debug_bin
+mock
+multiplexer
+proxy
+sendecho
+
+.env*
 **/__debug_bin*

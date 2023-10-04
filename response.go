@@ -11,7 +11,7 @@ type Response struct {
 	Data      []byte
 }
 
-func (r Response) WithCode(commandCode string) ResponseWithCode {
+func (r Response) ForCommandCode(commandCode []byte) ResponseWithCode {
 	responseCode := CalculateResponseCode(commandCode)
 	return ResponseWithCode{
 		ResponseCode: responseCode,
@@ -19,13 +19,11 @@ func (r Response) WithCode(commandCode string) ResponseWithCode {
 	}
 }
 
-func CalculateResponseCode(commandCode string) string {
-	if len(commandCode) < 2 {
-		return commandCode
+func CalculateResponseCode(commandCode []byte) string {
+	if len(commandCode) != 2 {
+		return "ZZ"
 	}
-	b := []byte(commandCode)
-	b[1]++
-	return string(commandCode)
+	return string([]byte{commandCode[0], commandCode[1] + 1})
 }
 
 type ResponseWithCode struct {
