@@ -40,3 +40,11 @@ func ReceivePacket(r io.Reader) (Packet, error) {
 func SendPacket(w io.Writer, packet Packet) error {
 	return SendFrame(w, packet.Bytes())
 }
+
+func CommandPacket(header []byte, cmd Command) Packet {
+	packet := Packet{
+		Header:  header,
+		Payload: CommandBytes(cmd),
+	}
+	return packet
+}

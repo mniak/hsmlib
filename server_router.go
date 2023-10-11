@@ -1,6 +1,8 @@
 package hsmlib
 
-import "strings"
+import (
+	"strings"
+)
 
 type CommandRouter struct {
 	handlers        map[string]CommandHandler
@@ -28,7 +30,8 @@ func (r *CommandRouter) AddHandler(commandCode string, h CommandHandler) *Comman
 }
 
 func (r *CommandRouter) FindHandler(req CommandWithHeader) CommandHandler {
-	if handler, found := r.handlers[strings.ToUpper(req.Code)]; found {
+	cmdString := strings.ToUpper(string(req.Code()))
+	if handler, found := r.handlers[cmdString]; found {
 		return handler
 	}
 	if r.fallbackHandler != nil {

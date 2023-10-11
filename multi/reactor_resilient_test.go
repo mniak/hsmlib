@@ -1,3 +1,3 @@
 package multi
 
-var _ Reactor = &_ResilientReactor{}
+var _ Reactor = &ResilientReactor{}

@@ -44,7 +44,7 @@ func (m *SequentialIDManager) FindChannel(id []byte) (chan<- []byte, bool) {
 }
 
 func (m *SequentialIDManager) CloseAllChannels() {
-	oldMap := m.ids
+	oldMap := &m.ids
 	m.ids = sync.Map{}
 	oldMap.Range(func(key, value any) bool {
 		channel := value.(chan []byte)

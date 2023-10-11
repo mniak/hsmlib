@@ -41,7 +41,7 @@ func makePacketHandler(cmdHandler CommandHandler) PacketHandler {
 
 		respPacket := Packet{
 			Header:  p.Header,
-			Payload: resp.WithCode(cmd.Code).Bytes(),
+			Payload: resp.ForCommandCode(cmd.Code()).Bytes(),
 		}
 		return ps.SendPacket(respPacket)
 	})
@@ -51,7 +51,7 @@ var DefaultLogger Logger = stdlib.NewLogger("[hsmlib] ")
 
 func ListenAndServePackets(addr string, handler PacketHandler) error {
 	server := NewPacketServer(DefaultLogger)
-	return ListenAndServeI(server, addr, handler)
+	return ListenAndServeI[PacketHandler](server, addr, handler)
 }
 
 func ListenAndServe(addr string, handler CommandHandler) error {
@@ -59,6 +59,6 @@ func ListenAndServe(addr string, handler CommandHandler) error {
 		Logger: DefaultLogger,
 	}
 
-	err := ListenAndServeI(&server, addr, handler)
+	err := ListenAndServeI[CommandHandler](&server, addr, handler)
 	return err
 }

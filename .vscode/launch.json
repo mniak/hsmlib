@@ -5,23 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Start Multiplexer",
+            "name": "Start Proxy",
             "type": "go",
             "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/cmd/multiplexer",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/proxy",
             "args": [
                 "--target", "localhost:1501",
-            ]
-        },
-        {
-            "name": "Start Multiplexer (TARGET_HSM)",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/cmd/multiplexer",
-            "args": [
-                "--target", "${environment:TARGET_HSM}",
             ]
         },
         {
@@ -32,29 +22,30 @@
             "program": "${workspaceFolder}/cmd/mock",
             "args": [
                 "--host", "127.0.0.1",
-                "--port", "1500",
+                "--port", "1501",
             ]
         },
         {
-            "name": "Send Echo (local)",
+            "name": "Send Echo",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/cmd/sendecho",
+            "program": "${workspaceFolder}/cmd/send",
             "args": [
-                "localhost:1500",
-                "hello_world",
+                "--target", ":3610",
+                "echo", "hello_world",
             ]
         },
         {
-            "name": "Send Echo (EC2)",
+            "name": "Send Raw",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/cmd/sendecho",
+            "program": "${workspaceFolder}/cmd/send",
             "args": [
-                "54.232.202.209:1500",
-                "This is an ECHO message!",
+                "--target", ":3610",
+                "raw", "--auto-header",
+                "B20005Hello",
             ]
         },
     ]

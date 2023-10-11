@@ -28,7 +28,7 @@ func LengthPrefix4H(data []byte) []byte {
 	return result
 }
 
-func ParseWithLengthPrefix4H(data []byte) (read []byte, remaining []byte, err error) {
+func ParseWithLengthPrefix4H(data []byte) (read, remaining []byte, err error) {
 	if len(data) < 4 {
 		return nil, nil, errors.New("could not decode length 4H: too short")
 	}

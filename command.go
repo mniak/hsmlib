@@ -5,20 +5,33 @@ import (
 	"io"
 )
 
-type Command struct {
-	Code string
-	Data []byte
+type Command interface {
+	Code() []byte
+	Data() []byte
 }
 
-func (c Command) WithHeader(header []byte) CommandWithHeader {
+type RawCommand struct {
+	RawCode string
+	RawData []byte
+}
+
+func (cmd RawCommand) Code() []byte {
+	return []byte(cmd.RawCode)
+}
+
+func (cmd RawCommand) Data() []byte {
+	return cmd.RawData
+}
+
+func (c RawCommand) WithHeader(header []byte) CommandWithHeader {
 	return CommandWithHeader{
 		Command: c,
 		Header:  header,
 	}
 }
 
-func (c Command) Bytes() []byte {
-	return append([]byte(c.Code), c.Data...)
+func CommandBytes(cmd Command) []byte {
+	return append(cmd.Code(), cmd.Data()...)
 }
 
 type CommandWithHeader struct {
@@ -39,15 +52,15 @@ func ReceiveCommand(r io.Reader) (CommandWithHeader, error) {
 	return cmdH, err
 }
 
-func ParseCommand(b []byte) (Command, error) {
+func ParseCommand(b []byte) (RawCommand, error) {
 	const codeLength = 2
 	if len(b) < codeLength {
-		return Command{}, errors.New("command data is shorter than the length of a command code")
+		return RawCommand{}, errors.New("command data is shorter than the length of a command code")
 	}
 
-	cmd := Command{
-		Code: string(b[:codeLength]),
-		Data: b[codeLength:],
+	cmd := RawCommand{
+		RawCode: string(b[:codeLength]),
+		RawData: b[codeLength:],
 	}
 	return cmd, nil
 }
@@ -55,7 +68,7 @@ func ParseCommand(b []byte) (Command, error) {
 func ReceiveRawCommand(r io.Reader) (Command, error) {
 	packet, err := ReceivePacket(r)
 	if err != nil {
-		return Command{}, err
+		return RawCommand{}, err
 	}
 	cmd, err := ParseCommand(packet.Payload)
 	return cmd, err

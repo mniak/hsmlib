@@ -18,7 +18,7 @@ func RunHSMMock(address string) error {
 		)
 		time.Sleep(time.Second * 1)
 
-		message, remaining, err := hsmlib.ParseWithLengthPrefix4H(cmd.Data)
+		message, remaining, err := hsmlib.ParseWithLengthPrefix4H(cmd.Data())
 		if err != nil || len(remaining) > 0 {
 			return hsmlib.InvalidInputDataResponse()
 		}

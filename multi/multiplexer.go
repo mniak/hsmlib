@@ -16,59 +16,38 @@ const (
 )
 
 type Multiplexer struct {
-	listenAddress string
-	targetAddress string
-	timeout       time.Duration
-	logger        hsmlib.Logger
-	server        hsmlib.PacketServer
+	Logger  hsmlib.Logger
+	Timeout time.Duration
 
+	server        hsmlib.PacketServer
 	out           Reactor
 	connectionIDs atomic.Uint64
 }
 
-type MultiplexerOption func(m *Multiplexer)
+var DefaultTimeout = 10 * time.Second
 
-func WithTimeout(timeout time.Duration) MultiplexerOption {
-	return func(m *Multiplexer) {
-		m.timeout = timeout
+func (m *Multiplexer) ensureInit() {
+	if m.Logger == nil {
+		m.Logger = noop.Logger()
 	}
+	m.server = hsmlib.NewPacketServer(m.Logger)
 }
 
-func WithLogger(logger hsmlib.Logger) MultiplexerOption {
-	return func(m *Multiplexer) {
-		m.logger = logger
-	}
-}
+func (m *Multiplexer) Run(listenAddr string, dialer Dialer) error {
+	m.ensureInit()
 
-var DefaultTimout = 10 * time.Second
-
-func NewMultiplexer(listenAddr, targetAddr string, opts ...MultiplexerOption) *Multiplexer {
-	m := &Multiplexer{
-		listenAddress: listenAddr,
-		targetAddress: targetAddr,
+	reactor := ResilientReactor{
+		Logger: m.Logger,
 	}
-	for _, opt := range opts {
-		opt(m)
-	}
-
-	if m.logger == nil {
-		m.logger = noop.Logger()
-	}
-	m.server = hsmlib.NewPacketServer(m.logger)
-	return m
-}
-
-func (m *Multiplexer) Run() error {
-	reactor := NewResilientReactor(m.targetAddress, m.logger)
-	if err := reactor.Start(); err != nil {
+	if err := reactor.Start(dialer); err != nil {
 		return err
 	}
-	m.out = reactor
+	m.out = &reactor
 
-	m.logger.Info("Multiplexer started")
+	m.Logger.Info("Multiplexer started")
 
 	packetHandler := hsmlib.PacketHandler(hsmlib.PacketHandlerFunc(m.HandleConnection))
-	return hsmlib.ListenAndServeI(m.server, m.listenAddress, packetHandler)
+	return hsmlib.ListenAndServeI[hsmlib.PacketHandler](m.server, listenAddr, packetHandler)
 }
 
 func (m *Multiplexer) HandleConnection(in hsmlib.PacketSender, packet hsmlib.Packet) error {
@@ -76,7 +55,7 @@ func (m *Multiplexer) HandleConnection(in hsmlib.PacketSender, packet hsmlib.Pac
 
 	reply, err := m.out.Post(packet.Payload)
 	if err != nil {
-		m.logger.Error("failed to forward message",
+		m.Logger.Error("failed to forward message",
 			KConnectionID, connID,
 			KRequestID, packet.Header,
 			KError, err,
@@ -100,14 +79,11 @@ func (m *Multiplexer) sendFailureResponse(in hsmlib.PacketSender, packet hsmlib.
 		ErrorCode: "99",
 		Data:      []byte(err.Error()),
 	}
-	respPacket := resp.WithCode(cmd.Code).
+	respPacket := resp.ForCommandCode(cmd.Code()).
 		WithHeader(packet.Header).
 		AsPacket()
 
-	err2 = in.SendPacket(hsmlib.Packet{
-		Header:  packet.Header,
-		Payload: respPacket.Bytes(),
-	})
+	err2 = in.SendPacket(respPacket)
 	if err2 != nil {
 		return multierr.Combine(err, err2)
 	}
