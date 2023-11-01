@@ -26,17 +26,6 @@
             ]
         },
         {
-            "name": "Send Echo",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/cmd/send",
-            "args": [
-                "--target", ":3610",
-                "echo", "hello_world",
-            ]
-        },
-        {
             "name": "Send Raw",
             "type": "go",
             "request": "launch",
@@ -46,6 +35,42 @@
                 "--target", ":3610",
                 "raw", "--auto-header",
                 "B20005Hello",
+            ]
+        },
+        {
+            "name": "Send Echo",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/send",
+            "args": [
+                "--verbose",
+                "--target", ":3610",
+                "echo", "hello_world",
+            ]
+        },
+        {
+            "name": "Send Healthcheck",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/send",
+            "args": [
+                "--verbose",
+                "--target", ":3610",
+                "healthcheck",
+            ]
+        },
+        {
+            "name": "Send Translate Key",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/send",
+            "args": [
+                "--verbose",
+                "--target", ":3610",
+                "translate", "key",
             ]
         },
     ]
