@@ -3,7 +3,7 @@ module github.com/mniak/hsmlib
 go 1.20
 
 require (
-	github.com/brianvoe/gofakeit/v6 v6.23.2
+	github.com/brianvoe/gofakeit/v6 v6.24.0
 	github.com/mniak/krypton v0.0.4
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.38.1
