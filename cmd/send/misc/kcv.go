@@ -38,7 +38,7 @@ func cmdKCV() cobra.Command {
 				fmt.Fprint(&bb, "1")
 			case thales.KeySchemeT:
 				fmt.Fprint(&bb, "2")
-			case thales.KeySchemeS, thales.KeySchemeR:
+			case thales.KeyScheme('S'), thales.KeyScheme('R'):
 				fmt.Fprint(&bb, "F")
 			default:
 				log.Fatalln("Unknown length for the specified key scheme")
@@ -48,7 +48,7 @@ func cmdKCV() cobra.Command {
 			switch keyScheme {
 			case thales.KeySchemeU, thales.KeySchemeT:
 				fmt.Fprint(&bb, keyType.Code(false))
-			case thales.KeySchemeS, thales.KeySchemeR:
+			case thales.KeyScheme('S'), thales.KeyScheme('R'):
 				fmt.Fprint(&bb, "FFF")
 			default:
 				log.Fatalln("Unknown key type code for the specified key scheme")

@@ -97,7 +97,7 @@ func cmdTranslateKey() cobra.Command {
 			b.Write("BW", "Command Indicator")
 			b.Write("FF", "Key Code - FF to use Key Type defined after delimiter")
 			b.Write("1", "Key Length Flag - 1: Double Length")
-			b.Write(sourceKeyScheme.String()+hex.ToString(encryptedCVK), "Encrypted Key under the Old MFK")
+			b.Write(string(sourceKeyScheme)+hex.ToString(encryptedCVK), "Encrypted Key under the Old MFK")
 
 			b.WriteComment("Conditional 3-digit type code section")
 			b.Write(";", "Delimiter")
