@@ -19,14 +19,27 @@ func NewCommandRouter() *CommandRouter {
 	}
 }
 
-func (r *CommandRouter) AddFallbackHandler(h CommandHandler) *CommandRouter {
-	r.fallbackHandler = h
+func (r *CommandRouter) AddFallbackHandler(handler CommandHandler) *CommandRouter {
+	r.fallbackHandler = handler
 	return r
 }
 
-func (r *CommandRouter) AddHandler(commandCode string, h CommandHandler) *CommandRouter {
-	r.handlers[strings.ToUpper(commandCode)] = h
+func (r *CommandRouter) AddHandler(commandCode string, handler CommandHandler) *CommandRouter {
+	r.handlers[strings.ToUpper(commandCode)] = handler
 	return r
+}
+
+func (r *CommandRouter) DecorateHandler(commandCode string, decorator CommandHandlerDecorator) *CommandRouter {
+	commandCode = strings.ToUpper(commandCode)
+	inner := r.handlers[commandCode]
+	r.handlers[commandCode] = CommandHandlerFunc(func(cmd CommandWithHeader) (Response, error) {
+		return decorator.Handle(inner, cmd)
+	})
+	return r
+}
+
+func (r *CommandRouter) DecorateHandlerFn(commandCode string, decoratorFn CommandHandlerDecoratorFunc) *CommandRouter {
+	return r.DecorateHandler(commandCode, decoratorFn)
 }
 
 func (r *CommandRouter) FindHandler(req CommandWithHeader) CommandHandler {

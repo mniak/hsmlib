@@ -4,14 +4,36 @@ import (
 	"bytes"
 	"errors"
 	"io"
+
+	"github.com/mniak/hsmlib/errcode"
 )
 
-type Response struct {
-	ErrorCode string
-	Data      []byte
+type Response interface {
+	ErrorCode() errcode.ErrorCode
+	Data() []byte
 }
 
-func (r Response) ForCommandCode(commandCode []byte) ResponseWithCode {
+type _SimpleResponse struct {
+	errorCode errcode.ErrorCode
+	data      []byte
+}
+
+func (sr _SimpleResponse) ErrorCode() errcode.ErrorCode {
+	return sr.errorCode
+}
+
+func (sr _SimpleResponse) Data() []byte {
+	return sr.data
+}
+
+func NewResponse(errorCode errcode.ErrorCode, data []byte) _SimpleResponse {
+	return _SimpleResponse{
+		errorCode: errorCode,
+		data:      data,
+	}
+}
+
+func AddCodeToResponse(r Response, commandCode []byte) ResponseWithCode {
 	responseCode := CalculateResponseCode(commandCode)
 	return ResponseWithCode{
 		ResponseCode: responseCode,
@@ -34,8 +56,8 @@ type ResponseWithCode struct {
 func (r ResponseWithCode) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.WriteString(r.ResponseCode)
-	buf.WriteString(r.ErrorCode)
-	buf.Write(r.Data)
+	buf.WriteString(r.ErrorCode().Code())
+	buf.Write(r.Data())
 	return buf.Bytes()
 }
 
@@ -51,23 +73,25 @@ func ParseResponse(data []byte) (ResponseWithCode, error) {
 	const errorCodeLength = 2
 
 	if len(data) < codeLength {
-		return ResponseWithCode{}, errors.New("response data does not contain a response code")
+		return ResponseWithCode{}, errors.New("response does not contain a response code")
 	}
 	code := string(data[:codeLength])
 	data = data[codeLength:]
 
 	if len(data) < errorCodeLength {
-		return ResponseWithCode{}, errors.New("response data does not contain an error code")
+		return ResponseWithCode{}, errors.New("response does not contain an error code")
 	}
-	errorCode := string(data[:errorCodeLength])
+	errorCodeBCD := data[:errorCodeLength]
 	data = data[errorCodeLength:]
+
+	errorCode, err := errcode.ParseBCD(errorCodeBCD)
+	if err != nil {
+		return ResponseWithCode{}, err
+	}
 
 	respC := ResponseWithCode{
 		ResponseCode: code,
-		Response: Response{
-			ErrorCode: errorCode,
-			Data:      data,
-		},
+		Response:     NewResponse(errorCode, data),
 	}
 	return respC, nil
 }

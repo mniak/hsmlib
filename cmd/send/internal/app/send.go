@@ -7,10 +7,12 @@ import (
 	"log"
 
 	"github.com/mniak/hsmlib"
-	"golang.org/x/exp/slog"
 )
 
 func (conn *_Connection) SendFrame(data []byte) hsmlib.ResponseWithHeader {
+	logger.Info("Sending frame",
+		"data", data,
+	)
 	err := hsmlib.SendFrame(conn, data)
 	if err != nil {
 		log.Fatalln(err)
@@ -21,17 +23,22 @@ func (conn *_Connection) SendFrame(data []byte) hsmlib.ResponseWithHeader {
 		log.Fatalln(err)
 	}
 
-	slog.Info("Response received:",
+	logger.Info("Response received:",
 		"header", hex.EncodeToString(reply.Header),
 		"response_code", reply.ResponseCode,
-		"error_code", reply.ErrorCode,
-		"data", fmt.Sprintf("%2X", reply.Data),
+		"error_code", fmt.Sprintf("%q", reply.ErrorCode()),
+		"raw", reply.Bytes(),
+		"data", reply.Data(),
 	)
 
 	return reply
 }
 
 func (conn *_Connection) SendPacket(packet hsmlib.Packet) hsmlib.ResponseWithHeader {
+	logger.Info("Sending packet",
+		"header", fmt.Sprintf("%2X", packet.Header),
+		"payload", packet.Payload,
+	)
 	response := conn.SendFrame(packet.Bytes())
 	if !bytes.Equal(response.Header, packet.Header) {
 		log.Fatalln("invalid response header")
@@ -44,4 +51,26 @@ func (conn *_Connection) SendPacket(packet hsmlib.Packet) hsmlib.ResponseWithHea
 		}
 	}
 	return response
+}
+
+func (conn *_Connection) SendPacketPayload(payload []byte) hsmlib.ResponseWithHeader {
+	packet := hsmlib.Packet{
+		Header:  RandomHeader(),
+		Payload: payload,
+	}
+	return conn.SendPacket(packet)
+}
+
+func (conn *_Connection) SendCommand(cmd hsmlib.Command) hsmlib.ResponseWithHeader {
+	logger.Info("Sending command",
+		"code", cmd.Code(),
+		"data", cmd.Data(),
+	)
+	payload := hsmlib.CommandBytes(cmd)
+	packet := hsmlib.Packet{
+		Header:  RandomHeader(),
+		Payload: payload,
+	}
+	reply := conn.SendPacket(packet)
+	return reply
 }

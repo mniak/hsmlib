@@ -64,7 +64,8 @@ func (r *ResilientReactor) connectAndSaveReactor(dialer Dialer, withRetry bool) 
 		return err
 	}
 	reactor := SimpleReactor{
-		Target: hsmlib.NewPacketStream(conn),
+		Target: hsmlib.NewPacketStream(conn).WithLogger(r.Logger),
+		Logger: r.Logger,
 	}
 	err = reactor.Start()
 	if err != nil {

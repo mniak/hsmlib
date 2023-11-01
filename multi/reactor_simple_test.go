@@ -39,8 +39,8 @@ func TestSimpleReactor_HappyPath_SingleRequest(t *testing.T) {
 	}).Return(fakeResponse, nil)
 	mockPacketStream.EXPECT().ReceivePacket().Return(hsmlib.Packet{}, io.EOF)
 	mockIDManager.EXPECT().FindChannel(fakeResponse.Header).Return(fakeResponseChan, true)
-
 	reactor := SimpleReactor{}
+
 	reactor.IDManager = mockIDManager
 	reactor.Target = mockPacketStream
 
