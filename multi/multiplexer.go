@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mniak/hsmlib"
+	"github.com/mniak/hsmlib/errcode"
 	"github.com/mniak/hsmlib/internal/noop"
 	"go.uber.org/multierr"
 )
@@ -18,6 +19,7 @@ const (
 type Multiplexer struct {
 	Logger  hsmlib.Logger
 	Timeout time.Duration
+	Verbose bool
 
 	server        hsmlib.PacketServer
 	out           Reactor
@@ -44,7 +46,7 @@ func (m *Multiplexer) Run(listenAddr string, dialer Dialer) error {
 	}
 	m.out = &reactor
 
-	m.Logger.Info("Multiplexer started")
+	m.Logger.Info("Multiplexer started", "address", listenAddr)
 
 	packetHandler := hsmlib.PacketHandler(hsmlib.PacketHandlerFunc(m.HandleConnection))
 	return hsmlib.ListenAndServeI[hsmlib.PacketHandler](m.server, listenAddr, packetHandler)
@@ -75,11 +77,8 @@ func (m *Multiplexer) sendFailureResponse(in hsmlib.PacketSender, packet hsmlib.
 	if err2 != nil {
 		return multierr.Combine(err, err2)
 	}
-	resp := hsmlib.Response{
-		ErrorCode: "99",
-		Data:      []byte(err.Error()),
-	}
-	respPacket := resp.ForCommandCode(cmd.Code()).
+	resp := hsmlib.NewResponse(errcode.ErrorCode(0x99), []byte(err.Error()))
+	respPacket := hsmlib.AddCodeToResponse(resp, cmd.Code()).
 		WithHeader(packet.Header).
 		AsPacket()
 

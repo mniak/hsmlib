@@ -11,7 +11,7 @@ type _Connection struct {
 	io.ReadWriteCloser
 }
 
-func newConnection(target string, useTls bool, clientCertFile, clientKeyFile string, skipVerify bool) (*_Connection, error) {
+func NewConnection(target string, useTls bool, clientCertFile, clientKeyFile string, skipVerify bool) (*_Connection, error) {
 	if !useTls {
 		conn, err := net.Dial("tcp", target)
 		return &_Connection{conn}, err

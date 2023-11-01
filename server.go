@@ -6,16 +6,6 @@ import (
 	"github.com/mniak/hsmlib/adapters/stdlib"
 )
 
-type CommandHandler interface {
-	Handle(cmd CommandWithHeader) (Response, error)
-}
-
-type CommandHandlerFunc func(cmd CommandWithHeader) (Response, error)
-
-func (h CommandHandlerFunc) Handle(cmd CommandWithHeader) (Response, error) {
-	return h(cmd)
-}
-
 type CommandServer struct {
 	Logger       Logger
 	packetServer PacketServer
@@ -41,7 +31,7 @@ func makePacketHandler(cmdHandler CommandHandler) PacketHandler {
 
 		respPacket := Packet{
 			Header:  p.Header,
-			Payload: resp.ForCommandCode(cmd.Code()).Bytes(),
+			Payload: AddCodeToResponse(resp, cmd.Code()).Bytes(),
 		}
 		return ps.SendPacket(respPacket)
 	})

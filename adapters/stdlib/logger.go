@@ -19,14 +19,27 @@ func NewLogger(prefix string) stdlogger {
 	}
 }
 
+const (
+	separator = " "
+	format    = "%s [%s]\n"
+)
+
 func (l stdlogger) Info(msg string, args ...any) {
-	fargs := formatArgs(args...)
-	l.infoLogger.Printf("%s %s\n", msg, fargs)
+	fargs := formatArgs(separator, args...)
+	if fargs == "" {
+		l.infoLogger.Print(msg)
+	} else {
+		l.infoLogger.Printf(format, msg, fargs)
+	}
 }
 
 func (l stdlogger) Error(msg string, args ...any) {
-	fargs := formatArgs(args...)
-	l.errorLogger.Printf("%s %s\n", msg, fargs)
+	fargs := formatArgs(separator, args...)
+	if fargs == "" {
+		l.infoLogger.Print(msg)
+	} else {
+		l.errorLogger.Printf(format, msg, fargs)
+	}
 }
 
 func getArgMap(args ...any) map[string]any {
@@ -46,19 +59,44 @@ func getArgMap(args ...any) map[string]any {
 	return result
 }
 
-func formatArgs(args ...any) string {
-	var pairs []string
+type argPair struct {
+	key   string
+	value any
+}
+
+func parseArgs(args ...any) []argPair {
+	var pairs []argPair
 	for len(args) > 0 {
-		key := fmt.Sprint(args[0])
+		pair := argPair{
+			key: fmt.Sprint(args[0]),
+		}
 		args = args[1:]
 
-		value := "(missing)"
 		if len(args) != 0 {
-			value = fmt.Sprint(args[0])
+			pair.value = args[0]
 			args = args[1:]
 
 		}
-		pairs = append(pairs, fmt.Sprintf("%s=%s", key, value))
+		pairs = append(pairs, pair)
 	}
-	return strings.Join(pairs, " ")
+	return pairs
+}
+
+func formatArgs(separator string, args ...any) string {
+	var sb strings.Builder
+	for idx, pair := range parseArgs(args...) {
+		if idx != 0 {
+			sb.WriteString(separator)
+		}
+		switch pair.value.(type) {
+		case []byte:
+			fmt.Fprintf(&sb, `%s/hex=%2X`, pair.key, pair.value)
+			sb.WriteString(separator)
+			fmt.Fprintf(&sb, `%s/str=%q`, pair.key, pair.value)
+
+		default:
+			fmt.Fprintf(&sb, `%s=%s`, pair.key, pair.value)
+		}
+	}
+	return sb.String()
 }

@@ -1,27 +1,24 @@
 package main
 
 import (
-	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"log"
+	"strings"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/mniak/hsmlib"
 	"github.com/mniak/hsmlib/cmd/send/internal/app"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slog"
 )
 
-func rawCommand() *cobra.Command {
+func cmdRaw() *cobra.Command {
 	var flagAutoHeader bool
 	var flagHex bool
 	cmd := cobra.Command{
 		Use:   "raw [--auto-header] <DATA>",
 		Short: "Sends raw data to an HSM",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			data := []byte(args[0])
+			data := []byte(strings.Join(args, ""))
 			if flagHex {
 				var err error
 				data, err = hex.DecodeString(string(data))
@@ -32,18 +29,13 @@ func rawCommand() *cobra.Command {
 
 			var reply hsmlib.ResponseWithHeader
 			if flagAutoHeader {
-				packet := hsmlib.Packet{
-					Header:  binary.BigEndian.AppendUint32(nil, gofakeit.Uint32()),
-					Payload: data,
-				}
-				slog.Info("Sending raw packet:",
-					"header", fmt.Sprintf("%2X", packet.Header),
-					"payload", fmt.Sprintf("%2X", packet.Payload),
+				app.Logger().Info("Sending raw packet payload:",
+					"data", data,
 				)
-				reply = app.SendPacket(packet)
+				reply = app.SendPacketPayload(data)
 			} else {
-				slog.Info("Sending raw frame:",
-					"data", fmt.Sprintf("%2X", data),
+				app.Logger().Info("Sending raw frame:",
+					"data", data,
 				)
 				reply = app.SendFrame(data)
 			}

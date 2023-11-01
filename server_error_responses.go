@@ -1,15 +1,15 @@
 package hsmlib
 
-func ErrorCodeResponse(errorCode string) (Response, error) {
-	return Response{
-		ErrorCode: errorCode,
-	}, nil
+import "github.com/mniak/hsmlib/errcode"
+
+func ErrorCodeResponse(errorCode errcode.ErrorCode) (Response, error) {
+	return NewResponse(errorCode, nil), nil
 }
 
 func CommandDisabledResponse() (Response, error) {
-	return ErrorCodeResponse("68") // Command has been disabled
+	return ErrorCodeResponse(errcode.CommandDisabled)
 }
 
 func InvalidInputDataResponse() (Response, error) {
-	return ErrorCodeResponse("15") // Invalid input data (invalid format, invalid characters, or not enough data provided)
+	return ErrorCodeResponse(errcode.InvalidInput)
 }
