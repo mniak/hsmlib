@@ -3,15 +3,15 @@ module github.com/mniak/hsmlib
 go 1.20
 
 require (
-	github.com/brianvoe/gofakeit/v6 v6.22.0
+	github.com/brianvoe/gofakeit/v6 v6.24.0
 	github.com/mniak/krypton v0.0.4
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.38.1
 	github.com/spf13/cobra v1.7.0
-	github.com/stretchr/testify v1.8.2
-	go.uber.org/mock v0.2.0
+	github.com/stretchr/testify v1.8.4
+	go.uber.org/mock v0.3.0
 	go.uber.org/multierr v1.11.0
-	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 )
 
 require (
